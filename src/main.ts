@@ -13,6 +13,16 @@ import {
 } from './config';
 
 async function bootstrap() {
+  // Debug: Mostrar variables de entorno relevantes
+  console.log('🔍 Environment Variables Debug:');
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('JWT_ENABLED:', process.env.JWT_ENABLED);
+  console.log('SWAGGER_ENABLED:', process.env.SWAGGER_ENABLED);
+  console.log('SWAGGER_PATH:', process.env.SWAGGER_PATH);
+  console.log(
+    'DATABASE_URL:',
+    process.env.DATABASE_URL ? '[SET]' : '[NOT SET]',
+  );
   const app = await NestFactory.create(AppModule, {
     logger: WinstonModule.createLogger(createWinstonConfig()),
   });

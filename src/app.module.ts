@@ -15,7 +15,9 @@ import {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: ['.env.local', '.env'],
+      ignoreEnvFile: false,
+      expandVariables: true,
       load: [databaseConfig, loggingConfig, swaggerConfig],
     }),
     WinstonModule.forRoot(createWinstonConfig()),
