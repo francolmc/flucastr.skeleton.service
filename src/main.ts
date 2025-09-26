@@ -36,20 +36,40 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor());
 
   // Swagger configuration
+  console.log('🔍 Swagger Debug:');
+  console.log('SwaggerUtils.isEnabled():', SwaggerUtils.isEnabled());
+  console.log(
+    'NODE_ENV includes test:',
+    process.env.NODE_ENV?.includes('test'),
+  );
+  console.log(
+    'SWAGGER_ENABLED !== "false":',
+    process.env.SWAGGER_ENABLED !== 'false',
+  );
   if (SwaggerUtils.isEnabled()) {
-    const swaggerBuilder = createSwaggerDocumentBuilder();
-    const swaggerConfig = swaggerBuilder.build();
-    const swaggerOptions = createSwaggerDocumentOptions();
-    const uiOptions = createSwaggerUIOptions();
+    console.log('✅ Swagger is enabled, setting up...');
+    try {
+      const swaggerBuilder = createSwaggerDocumentBuilder();
+      const swaggerConfig = swaggerBuilder.build();
+      const swaggerOptions = createSwaggerDocumentOptions();
+      const uiOptions = createSwaggerUIOptions();
 
-    const document = SwaggerModule.createDocument(
-      app,
-      swaggerConfig,
-      swaggerOptions,
-    );
-    const swaggerPath = process.env.SWAGGER_PATH || 'api';
+      console.log('📝 Creating Swagger document...');
+      const document = SwaggerModule.createDocument(
+        app,
+        swaggerConfig,
+        swaggerOptions,
+      );
+      const swaggerPath = process.env.SWAGGER_PATH || 'api';
 
-    SwaggerModule.setup(swaggerPath, app, document, uiOptions);
+      console.log(`📝 Setting up Swagger at /${swaggerPath}...`);
+      SwaggerModule.setup(swaggerPath, app, document, uiOptions);
+      console.log(`✅ Swagger setup complete at /${swaggerPath}`);
+    } catch (error) {
+      console.error('❌ Error setting up Swagger:', error);
+    }
+  } else {
+    console.log('❌ Swagger is disabled');
   }
 
   await app.listen(process.env.PORT ?? 3001);
