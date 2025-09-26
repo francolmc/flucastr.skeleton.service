@@ -33,7 +33,13 @@ export {
   SwaggerUtils,
 } from './swagger.config';
 
+// App configuration
+export { default as appConfig } from './app.config';
+export type { AppConfig } from './app.config';
+export { AppConfigUtils } from './app.config';
+
 // Re-export all configuration types and utilities
 export * from './database.config';
 export * from './logging.config';
 export * from './swagger.config';
+export * from './app.config';

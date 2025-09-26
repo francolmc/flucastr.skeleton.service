@@ -8,6 +8,7 @@ import {
   databaseConfig,
   loggingConfig,
   swaggerConfig,
+  appConfig,
   createWinstonConfig,
 } from './config';
 
@@ -18,7 +19,7 @@ import {
       envFilePath: ['.env.local', '.env'],
       ignoreEnvFile: false,
       expandVariables: true,
-      load: [databaseConfig, loggingConfig, swaggerConfig],
+      load: [databaseConfig, loggingConfig, swaggerConfig, appConfig],
     }),
     WinstonModule.forRoot(createWinstonConfig()),
     DatabaseModule,

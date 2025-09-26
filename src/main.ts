@@ -10,12 +10,17 @@ import {
   createSwaggerDocumentOptions,
   createSwaggerUIOptions,
   SwaggerUtils,
+  AppConfigUtils,
 } from './config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: WinstonModule.createLogger(createWinstonConfig()),
   });
+
+  // Set global prefix
+  const globalPrefix = AppConfigUtils.getGlobalPrefix();
+  app.setGlobalPrefix(globalPrefix);
 
   // Enable versioning
   app.enableVersioning({
@@ -42,18 +47,23 @@ async function bootstrap() {
     SwaggerModule.setup(swaggerPath, app, document, uiOptions);
   }
 
-  await app.listen(process.env.PORT ?? 3001);
+  const port = AppConfigUtils.getPort();
+  await app.listen(port);
   const baseUrl = await app.getUrl();
 
-  console.log(`🚀 Application is running on: ${baseUrl}`);
+  const envInfo = AppConfigUtils.getEnvironmentInfo();
+
+  console.log(`🚀 ${envInfo.name} is running on: ${baseUrl}`);
+  console.log(`📡 Global prefix: /${globalPrefix}`);
 
   if (SwaggerUtils.isEnabled()) {
     const swaggerPath = process.env.SWAGGER_PATH || 'api';
     console.log(`📚 Swagger is running on: ${baseUrl}/${swaggerPath}`);
   }
 
-  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`⚡ Flucastr Lleva - Service v1.0 ready!\n`);
+  console.log(`🔧 Environment: ${envInfo.environment}`);
+  console.log(`📦 Version: ${envInfo.version}`);
+  console.log(`⚡ ${envInfo.name} v${envInfo.version} ready!\n`);
 }
 bootstrap().catch((err) => {
   console.error('🐛 Error during application bootstrap:', err);
