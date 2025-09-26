@@ -23,6 +23,17 @@ export {
   LoggingUtils,
 } from './logging.config';
 
+// Swagger configuration
+export { default as swaggerConfig } from './swagger.config';
+export type { SwaggerConfig } from './swagger.config';
+export {
+  createSwaggerDocumentBuilder,
+  createSwaggerDocumentOptions,
+  createSwaggerUIOptions,
+  SwaggerUtils,
+} from './swagger.config';
+
 // Re-export all configuration types and utilities
 export * from './database.config';
 export * from './logging.config';
+export * from './swagger.config';

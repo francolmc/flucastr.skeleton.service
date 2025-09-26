@@ -4,14 +4,19 @@ import { WinstonModule } from 'nest-winston';
 import { DatabaseModule } from './modules/database/database.module';
 import { HealthModule } from './modules/health/health.module';
 import { TasksModule } from './modules/tasks/tasks.module';
-import { databaseConfig, loggingConfig, createWinstonConfig } from './config';
+import {
+  databaseConfig,
+  loggingConfig,
+  swaggerConfig,
+  createWinstonConfig,
+} from './config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
-      load: [databaseConfig, loggingConfig],
+      load: [databaseConfig, loggingConfig, swaggerConfig],
     }),
     WinstonModule.forRoot(createWinstonConfig()),
     DatabaseModule,
