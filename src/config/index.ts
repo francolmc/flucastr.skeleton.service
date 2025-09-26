@@ -13,5 +13,16 @@ export {
   getEnvironmentSpecificConfig,
 } from './database.config';
 
+// Logging configuration
+export { default as loggingConfig } from './logging.config';
+export type { LoggingConfig } from './logging.config';
+export {
+  createWinstonConfig,
+  LoggingContexts,
+  LogLevels,
+  LoggingUtils,
+} from './logging.config';
+
 // Re-export all configuration types and utilities
 export * from './database.config';
+export * from './logging.config';

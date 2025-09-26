@@ -1,17 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { WinstonModule } from 'nest-winston';
 import { DatabaseModule } from './modules/database/database.module';
 import { HealthModule } from './modules/health/health.module';
 import { TasksModule } from './modules/tasks/tasks.module';
-import databaseConfig from './config/database.config';
+import { databaseConfig, loggingConfig, createWinstonConfig } from './config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
-      load: [databaseConfig],
+      load: [databaseConfig, loggingConfig],
     }),
+    WinstonModule.forRoot(createWinstonConfig()),
     DatabaseModule,
     HealthModule,
     TasksModule,
