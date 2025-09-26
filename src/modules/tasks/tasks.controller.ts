@@ -87,7 +87,7 @@ export class TasksController {
     example: 'desc',
   })
   async findAll(
-    @Query(ValidationPipe) pagination: PaginationDto,
+    @Query(new ValidationPipe({ transform: true })) pagination: PaginationDto,
   ): Promise<TaskResponseDto[]> {
     const tasks = await this.tasksService.findAll(pagination);
     return tasks.map((task) => new TaskResponseDto(task));
@@ -108,7 +108,7 @@ export class TasksController {
     type: PaginatedTaskResponseDto,
   })
   async findAllPaginated(
-    @Query(ValidationPipe) pagination: PaginationDto,
+    @Query(new ValidationPipe({ transform: true })) pagination: PaginationDto,
   ): Promise<PaginatedTaskResponseDto> {
     const result = await this.tasksService.findAllPaginated(pagination);
     return new PaginatedTaskResponseDto({
@@ -159,7 +159,7 @@ export class TasksController {
     example: 'autenticación',
   })
   async searchTasks(
-    @Query(ValidationPipe) searchDto: TaskSearchDto,
+    @Query(new ValidationPipe({ transform: true })) searchDto: TaskSearchDto,
   ): Promise<TaskResponseDto[]> {
     const { status, startDate, endDate, search, ...pagination } = searchDto;
     const filters = {
@@ -212,7 +212,7 @@ export class TasksController {
   })
   async findByStatus(
     @Param('status') status: TaskStatus,
-    @Query(ValidationPipe) pagination: PaginationDto,
+    @Query(new ValidationPipe({ transform: true })) pagination: PaginationDto,
   ): Promise<TaskResponseDto[]> {
     const tasks = await this.tasksService.findByStatus(status, pagination);
     return tasks.map((task) => new TaskResponseDto(task));

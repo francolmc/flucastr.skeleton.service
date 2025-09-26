@@ -37,11 +37,15 @@ export class TasksRepository implements TaskRepositoryInterface {
         sortBy = 'createdAt',
         sortOrder = 'desc',
       } = options || {};
-      const skip = (page - 1) * limit;
+
+      // Asegurar que page y limit sean números
+      const pageNum = Number(page);
+      const limitNum = Number(limit);
+      const skip = (pageNum - 1) * limitNum;
 
       const tasks = await this.databaseService.tasks.findMany({
         skip,
-        take: limit,
+        take: limitNum,
         orderBy: {
           [sortBy]: sortOrder,
         },
@@ -95,14 +99,18 @@ export class TasksRepository implements TaskRepositoryInterface {
         sortBy = 'createdAt',
         sortOrder = 'desc',
       } = options || {};
-      const skip = (page - 1) * limit;
+
+      // Asegurar que page y limit sean números
+      const pageNum = Number(page);
+      const limitNum = Number(limit);
+      const skip = (pageNum - 1) * limitNum;
 
       const whereClause = this.buildWhereClause(filters);
 
       const tasks = await this.databaseService.tasks.findMany({
         where: whereClause,
         skip,
-        take: limit,
+        take: limitNum,
         orderBy: {
           [sortBy]: sortOrder,
         },
