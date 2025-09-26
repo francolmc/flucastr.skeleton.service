@@ -126,10 +126,7 @@ export class TasksService implements TaskServiceInterface {
     try {
       // Validar filtros de fecha
       if (filters.startDate && filters.endDate) {
-        const startDate = new Date(filters.startDate);
-        const endDate = new Date(filters.endDate);
-
-        if (startDate > endDate) {
+        if (filters.startDate > filters.endDate) {
           throw new BadRequestException('Start date cannot be after end date');
         }
       }

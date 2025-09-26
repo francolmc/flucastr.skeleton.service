@@ -301,10 +301,10 @@ export class TasksRepository implements TaskRepositoryInterface {
     if (filters.startDate || filters.endDate) {
       where.createdAt = {};
       if (filters.startDate) {
-        where.createdAt.gte = new Date(filters.startDate);
+        where.createdAt.gte = filters.startDate;
       }
       if (filters.endDate) {
-        where.createdAt.lte = new Date(filters.endDate);
+        where.createdAt.lte = filters.endDate;
       }
     }
 
