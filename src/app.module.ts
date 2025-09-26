@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './modules/database/database.module';
 import { HealthModule } from './modules/health/health.module';
+import { TasksModule } from './modules/tasks/tasks.module';
 import databaseConfig from './config/database.config';
 
 @Module({
@@ -13,7 +14,8 @@ import databaseConfig from './config/database.config';
     }),
     DatabaseModule,
     HealthModule,
-    // TODO: Add your service modules here
+    TasksModule,
+    // TODO: Add your additional service modules here
     // ExampleModule,
   ],
   controllers: [],
