@@ -41,9 +41,7 @@ async function bootstrap() {
   // Swagger
   const config = new DocumentBuilder()
     .setTitle('Flucastr Lleva - Service API')
-    .setDescription(
-      'API del microservicio para la plataforma Flucastr Lleva',
-    )
+    .setDescription('API del microservicio para la plataforma Flucastr Lleva')
     .setVersion('1.0')
     .addTag('Service API')
     .addBearerAuth(
