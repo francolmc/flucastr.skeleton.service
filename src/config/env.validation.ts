@@ -43,6 +43,33 @@ export interface ValidatedEnvironmentVariables {
   LOG_MAX_SIZE: string;
 
   // =================================
+  // JWT CONFIGURATION
+  // =================================
+  JWT_ENABLED: boolean;
+  JWT_SECRET: string;
+  JWT_ALGORITHM: string;
+  JWT_ISSUER: string;
+  JWT_AUDIENCE: string;
+  JWT_IGNORE_EXPIRATION: boolean;
+  JWT_CLOCK_TOLERANCE: number;
+  JWT_MAX_AGE?: string;
+  JWT_EXTRACT_FROM_HEADER: boolean;
+  JWT_EXTRACT_FROM_QUERY: boolean;
+  JWT_EXTRACT_FROM_COOKIE: boolean;
+  JWT_HEADER_NAME: string;
+  JWT_QUERY_PARAM: string;
+  JWT_COOKIE_NAME: string;
+  JWT_ROLES_CLAIM_KEY: string;
+  JWT_PERMISSIONS_CLAIM_KEY: string;
+  JWT_USER_ID_CLAIM_KEY: string;
+  JWT_TENANT_ID_CLAIM_KEY: string;
+  JWT_ENABLE_CACHE: boolean;
+  JWT_CACHE_TTL: number;
+  JWT_ENABLE_LOGGING: boolean;
+  JWT_LOG_FAILED_ATTEMPTS: boolean;
+  JWT_PUBLIC_KEY?: string;
+
+  // =================================
   // SWAGGER CONFIGURATION
   // =================================
   SWAGGER_ENABLED: boolean;
@@ -58,7 +85,6 @@ export interface ValidatedEnvironmentVariables {
   SWAGGER_SERVER_URL: string;
 
   // Swagger Security
-  JWT_ENABLED: boolean;
   API_KEY_ENABLED: boolean;
   API_KEY_NAME: string;
   API_KEY_LOCATION: 'header' | 'query' | 'cookie';
@@ -288,6 +314,110 @@ export const envValidationSchema = Joi.object<ValidatedEnvironmentVariables>({
     .description('Maximum size of each log file'),
 
   // =================================
+  // JWT CONFIGURATION
+  // =================================
+  JWT_ENABLED: Joi.boolean()
+    .default(true)
+    .description('Enable JWT authentication'),
+
+  JWT_SECRET: Joi.string()
+    .min(32)
+    .default('your-super-secret-jwt-key-change-in-production')
+    .description('JWT secret key for token validation'),
+
+  JWT_ALGORITHM: Joi.string()
+    .valid('HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512')
+    .default('HS256')
+    .description('JWT algorithm for token validation'),
+
+  JWT_ISSUER: Joi.string()
+    .default('flucastr-auth-service')
+    .description('Expected JWT issuer'),
+
+  JWT_AUDIENCE: Joi.string()
+    .default('flucastr-services')
+    .description('Expected JWT audience'),
+
+  JWT_IGNORE_EXPIRATION: Joi.boolean()
+    .default(false)
+    .description('Ignore JWT expiration (only for development)'),
+
+  JWT_CLOCK_TOLERANCE: Joi.number()
+    .integer()
+    .min(0)
+    .max(300)
+    .default(30)
+    .description('JWT clock tolerance in seconds'),
+
+  JWT_MAX_AGE: Joi.string()
+    .pattern(/^\d+[smhd]$/)
+    .optional()
+    .description('Maximum age of JWT tokens (e.g., 1d, 2h, 30m)'),
+
+  JWT_EXTRACT_FROM_HEADER: Joi.boolean()
+    .default(true)
+    .description('Extract JWT from Authorization header'),
+
+  JWT_EXTRACT_FROM_QUERY: Joi.boolean()
+    .default(false)
+    .description('Extract JWT from query parameter'),
+
+  JWT_EXTRACT_FROM_COOKIE: Joi.boolean()
+    .default(false)
+    .description('Extract JWT from cookie'),
+
+  JWT_HEADER_NAME: Joi.string()
+    .default('Authorization')
+    .description('Header name for JWT extraction'),
+
+  JWT_QUERY_PARAM: Joi.string()
+    .default('token')
+    .description('Query parameter name for JWT extraction'),
+
+  JWT_COOKIE_NAME: Joi.string()
+    .default('access_token')
+    .description('Cookie name for JWT extraction'),
+
+  JWT_ROLES_CLAIM_KEY: Joi.string()
+    .default('roles')
+    .description('JWT claim key for user roles'),
+
+  JWT_PERMISSIONS_CLAIM_KEY: Joi.string()
+    .default('permissions')
+    .description('JWT claim key for user permissions'),
+
+  JWT_USER_ID_CLAIM_KEY: Joi.string()
+    .default('sub')
+    .description('JWT claim key for user ID'),
+
+  JWT_TENANT_ID_CLAIM_KEY: Joi.string()
+    .default('tenant_id')
+    .description('JWT claim key for tenant ID'),
+
+  JWT_ENABLE_CACHE: Joi.boolean()
+    .default(false)
+    .description('Enable JWT token caching'),
+
+  JWT_CACHE_TTL: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(300)
+    .description('JWT cache TTL in seconds'),
+
+  JWT_ENABLE_LOGGING: Joi.boolean()
+    .default(true)
+    .description('Enable JWT logging'),
+
+  JWT_LOG_FAILED_ATTEMPTS: Joi.boolean()
+    .default(true)
+    .description('Log failed JWT validation attempts'),
+
+  JWT_PUBLIC_KEY: Joi.string()
+    .optional()
+    .description('JWT public key for RSA algorithms'),
+
+  // =================================
   // SWAGGER CONFIGURATION
   // =================================
   SWAGGER_ENABLED: Joi.boolean()
@@ -343,10 +473,6 @@ export const envValidationSchema = Joi.object<ValidatedEnvironmentVariables>({
     .description('Server URL for Swagger documentation'),
 
   // Swagger Security
-  JWT_ENABLED: Joi.boolean()
-    .default(true)
-    .description('Enable JWT authentication in Swagger'),
-
   API_KEY_ENABLED: Joi.boolean()
     .default(false)
     .description('Enable API Key authentication in Swagger'),

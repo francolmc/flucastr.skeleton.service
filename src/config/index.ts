@@ -38,6 +38,11 @@ export { default as appConfig } from './app.config';
 export type { AppConfig } from './app.config';
 export { AppConfigUtils } from './app.config';
 
+// JWT configuration
+export { default as jwtConfig } from './jwt.config';
+export type { JwtConfig } from './jwt.config';
+export { JwtConfigUtils } from './jwt.config';
+
 // Environment validation
 export {
   validateEnvironmentVariables,
