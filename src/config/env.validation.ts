@@ -200,9 +200,9 @@ export const envValidationSchema = Joi.object<ValidatedEnvironmentVariables>({
     .description('Name of the application'),
 
   APP_VERSION: Joi.string()
-    .pattern(/^\d+\.\d+\.\d+$/)
+    .pattern(/^\d+\.\d+(\.\d+)?$/)
     .default('1.0.0')
-    .description('Version of the application (semver format)'),
+    .description('Version of the application (semver format: x.y.z or x.y)'),
 
   APP_DESCRIPTION: Joi.string()
     .default('Microservicio para la plataforma Flucastr Lleva')
@@ -308,9 +308,11 @@ export const envValidationSchema = Joi.object<ValidatedEnvironmentVariables>({
     .description('Description for Swagger documentation'),
 
   SWAGGER_VERSION: Joi.string()
-    .pattern(/^\d+\.\d+\.\d+$/)
+    .pattern(/^\d+\.\d+(\.\d+)?$/)
     .default('1.0.0')
-    .description('API version for Swagger documentation'),
+    .description(
+      'API version for Swagger documentation (semver format: x.y.z or x.y)',
+    ),
 
   SWAGGER_CONTACT_NAME: Joi.string()
     .default('Flucastr Team')
