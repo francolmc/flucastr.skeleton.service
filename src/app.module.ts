@@ -10,6 +10,8 @@ import {
   swaggerConfig,
   appConfig,
   createWinstonConfig,
+  validateEnvironmentVariables,
+  envValidationSchema,
 } from './config';
 
 @Module({
@@ -19,6 +21,8 @@ import {
       envFilePath: ['.env.local', '.env'],
       ignoreEnvFile: false,
       expandVariables: true,
+      validationSchema: envValidationSchema,
+      validate: validateEnvironmentVariables,
       load: [databaseConfig, loggingConfig, swaggerConfig, appConfig],
     }),
     WinstonModule.forRoot(createWinstonConfig()),

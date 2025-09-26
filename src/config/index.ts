@@ -38,8 +38,17 @@ export { default as appConfig } from './app.config';
 export type { AppConfig } from './app.config';
 export { AppConfigUtils } from './app.config';
 
+// Environment validation
+export {
+  validateEnvironmentVariables,
+  envValidationSchema,
+  EnvValidationUtils,
+} from './env.validation';
+export type { ValidatedEnvironmentVariables } from './env.validation';
+
 // Re-export all configuration types and utilities
 export * from './database.config';
 export * from './logging.config';
 export * from './swagger.config';
 export * from './app.config';
+export * from './env.validation';

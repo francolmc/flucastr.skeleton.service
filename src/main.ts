@@ -11,6 +11,7 @@ import {
   createSwaggerUIOptions,
   SwaggerUtils,
   AppConfigUtils,
+  EnvValidationUtils,
 } from './config';
 
 async function bootstrap() {
@@ -63,6 +64,15 @@ async function bootstrap() {
 
   console.log(`🔧 Environment: ${envInfo.environment}`);
   console.log(`📦 Version: ${envInfo.version}`);
+
+  // Environment validation report (only in development)
+  if (AppConfigUtils.isDevelopment()) {
+    const missingVars = EnvValidationUtils.checkRequiredVariables();
+    if (missingVars.length > 0) {
+      console.warn(`⚠️  Missing required variables: ${missingVars.join(', ')}`);
+    }
+  }
+
   console.log(`⚡ ${envInfo.name} v${envInfo.version} ready!\n`);
 }
 bootstrap().catch((err) => {
