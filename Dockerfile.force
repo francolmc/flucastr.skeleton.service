@@ -1,0 +1,51 @@
+# Multi-stage build for production
+FROM node:20-alpine AS dependencies
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Production stage
+FROM node:20-alpine AS production
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependencies from previous stage
+COPY --from=dependencies /app/node_modules ./node_modules
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Copy Prisma schema
+COPY prisma ./prisma
+
+# Copy source code
+COPY . .
+
+# Copy and make scripts executable
+COPY scripts/force-migrate.sh /app/force-migrate.sh
+RUN chmod +x /app/force-migrate.sh
+
+# Generate Prisma Client
+RUN pnpm prisma generate
+
+# Build the application
+RUN pnpm build
+
+# Expose port
+EXPOSE 3001
+
+# Use force migration script
+CMD ["/app/force-migrate.sh"]
