@@ -70,6 +70,13 @@ export interface ValidatedEnvironmentVariables {
   JWT_PUBLIC_KEY?: string;
 
   // =================================
+  // AUTH SERVICE CONFIGURATION
+  // =================================
+  AUTH_SERVICE_URL: string;
+  AUTH_SERVICE_INTROSPECT_ENDPOINT: string;
+  AUTH_SERVICE_TIMEOUT: number;
+
+  // =================================
   // SWAGGER CONFIGURATION
   // =================================
   SWAGGER_ENABLED: boolean;
@@ -416,6 +423,25 @@ export const envValidationSchema = Joi.object<ValidatedEnvironmentVariables>({
   JWT_PUBLIC_KEY: Joi.string()
     .optional()
     .description('JWT public key for RSA algorithms'),
+
+  // =================================
+  // AUTH SERVICE CONFIGURATION
+  // =================================
+  AUTH_SERVICE_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .default('https://skeleton-auth-service.nsideas.cl')
+    .description('Base URL of the authentication service'),
+
+  AUTH_SERVICE_INTROSPECT_ENDPOINT: Joi.string()
+    .default('/v1/auth/introspect')
+    .description('Endpoint for token introspection'),
+
+  AUTH_SERVICE_TIMEOUT: Joi.number()
+    .integer()
+    .min(1000)
+    .max(30000)
+    .default(5000)
+    .description('Authentication service request timeout in milliseconds'),
 
   // =================================
   // SWAGGER CONFIGURATION

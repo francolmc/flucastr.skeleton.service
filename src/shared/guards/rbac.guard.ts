@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AuthenticatedUser } from './jwt.guard';
+import { AuthenticatedUser } from '../interfaces/auth.interface';
 
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 

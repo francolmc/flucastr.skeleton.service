@@ -17,6 +17,8 @@ import {
   HttpStatus,
   ParseIntPipe,
   ValidationPipe,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,7 +27,10 @@ import {
   ApiParam,
   ApiQuery,
   ApiBody,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
+import { JwtGuard } from '../auth';
+import { AuthenticatedUser } from '../../shared/interfaces/auth.interface';
 import { TasksService } from './tasks.service';
 import {
   CreateTaskDto,
@@ -39,6 +44,8 @@ import {
 import { TaskStatus } from './entities/types';
 
 @ApiTags('tasks')
+@ApiBearerAuth('jwt')
+@UseGuards(JwtGuard)
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
@@ -88,8 +95,10 @@ export class TasksController {
   })
   async findAll(
     @Query(new ValidationPipe({ transform: true })) pagination: PaginationDto,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto[]> {
-    const tasks = await this.tasksService.findAll(pagination);
+    const userId = request.user.id;
+    const tasks = await this.tasksService.findAll(userId, pagination);
     return tasks.map((task) => new TaskResponseDto(task));
   }
 
@@ -109,8 +118,10 @@ export class TasksController {
   })
   async findAllPaginated(
     @Query(new ValidationPipe({ transform: true })) pagination: PaginationDto,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<PaginatedTaskResponseDto> {
-    const result = await this.tasksService.findAllPaginated(pagination);
+    const userId = request.user.id;
+    const result = await this.tasksService.findAllPaginated(userId, pagination);
     return new PaginatedTaskResponseDto({
       data: result.data.map((task) => new TaskResponseDto(task)),
       meta: result.meta,
@@ -160,7 +171,9 @@ export class TasksController {
   })
   async searchTasks(
     @Query(new ValidationPipe({ transform: true })) searchDto: TaskSearchDto,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto[]> {
+    const userId = request.user.id;
     const { status, startDate, endDate, search, ...pagination } = searchDto;
     const filters = {
       status,
@@ -169,7 +182,11 @@ export class TasksController {
       search,
     };
 
-    const tasks = await this.tasksService.findByFilters(filters, pagination);
+    const tasks = await this.tasksService.findByFilters(
+      filters,
+      userId,
+      pagination,
+    );
     return tasks.map((task) => new TaskResponseDto(task));
   }
 
@@ -186,8 +203,11 @@ export class TasksController {
     description: 'Métricas obtenidas exitosamente',
     type: TaskMetricsResponseDto,
   })
-  async getMetrics(): Promise<TaskMetricsResponseDto> {
-    const metrics = await this.tasksService.getMetrics();
+  async getMetrics(
+    @Req() request: { user: AuthenticatedUser },
+  ): Promise<TaskMetricsResponseDto> {
+    const userId = request.user.id;
+    const metrics = await this.tasksService.getMetrics(userId);
     return new TaskMetricsResponseDto(metrics);
   }
 
@@ -213,8 +233,14 @@ export class TasksController {
   async findByStatus(
     @Param('status') status: TaskStatus,
     @Query(new ValidationPipe({ transform: true })) pagination: PaginationDto,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto[]> {
-    const tasks = await this.tasksService.findByStatus(status, pagination);
+    const userId = request.user.id;
+    const tasks = await this.tasksService.findByStatus(
+      status,
+      userId,
+      pagination,
+    );
     return tasks.map((task) => new TaskResponseDto(task));
   }
 
@@ -243,8 +269,10 @@ export class TasksController {
   })
   async findById(
     @Param('id', ParseIntPipe) id: number,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto> {
-    const task = await this.tasksService.findById(id);
+    const userId = request.user.id;
+    const task = await this.tasksService.findById(id, userId);
     return new TaskResponseDto(task);
   }
 
@@ -276,8 +304,14 @@ export class TasksController {
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body(ValidationPipe) createTaskDto: CreateTaskDto,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto> {
-    const task = await this.tasksService.create(createTaskDto);
+    const userId = request.user.id;
+    const createTaskData = {
+      ...createTaskDto,
+      userId,
+    };
+    const task = await this.tasksService.create(createTaskData);
     return new TaskResponseDto(task);
   }
 
@@ -315,8 +349,10 @@ export class TasksController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body(ValidationPipe) updateTaskDto: UpdateTaskDto,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto> {
-    const task = await this.tasksService.update(id, updateTaskDto);
+    const userId = request.user.id;
+    const task = await this.tasksService.update(id, updateTaskDto, userId);
     return new TaskResponseDto(task);
   }
 
@@ -346,8 +382,10 @@ export class TasksController {
   async partialUpdate(
     @Param('id', ParseIntPipe) id: number,
     @Body(ValidationPipe) updateTaskDto: UpdateTaskDto,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto> {
-    const task = await this.tasksService.update(id, updateTaskDto);
+    const userId = request.user.id;
+    const task = await this.tasksService.update(id, updateTaskDto, userId);
     return new TaskResponseDto(task);
   }
 
@@ -379,8 +417,12 @@ export class TasksController {
     description: 'No se puede eliminar una tarea completada',
   })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id', ParseIntPipe) id: number): Promise<void> {
-    await this.tasksService.delete(id);
+  async delete(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: { user: AuthenticatedUser },
+  ): Promise<void> {
+    const userId = request.user.id;
+    await this.tasksService.delete(id, userId);
   }
 
   /**
@@ -408,8 +450,10 @@ export class TasksController {
   })
   async markAsCompleted(
     @Param('id', ParseIntPipe) id: number,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto> {
-    const task = await this.tasksService.markAsCompleted(id);
+    const userId = request.user.id;
+    const task = await this.tasksService.markAsCompleted(id, userId);
     return new TaskResponseDto(task);
   }
 
@@ -438,8 +482,10 @@ export class TasksController {
   })
   async markAsInProgress(
     @Param('id', ParseIntPipe) id: number,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto> {
-    const task = await this.tasksService.markAsInProgress(id);
+    const userId = request.user.id;
+    const task = await this.tasksService.markAsInProgress(id, userId);
     return new TaskResponseDto(task);
   }
 
@@ -468,8 +514,10 @@ export class TasksController {
   })
   async markAsCancelled(
     @Param('id', ParseIntPipe) id: number,
+    @Req() request: { user: AuthenticatedUser },
   ): Promise<TaskResponseDto> {
-    const task = await this.tasksService.markAsCancelled(id);
+    const userId = request.user.id;
+    const task = await this.tasksService.markAsCancelled(id, userId);
     return new TaskResponseDto(task);
   }
 }

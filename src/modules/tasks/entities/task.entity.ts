@@ -27,6 +27,11 @@ export class Task {
   status: TaskStatus;
 
   /**
+   * ID del usuario que creó la tarea
+   */
+  userId: string;
+
+  /**
    * Fecha de creación de la tarea
    */
   createdAt: Date;
@@ -111,6 +116,7 @@ export class Task {
       title: this.title,
       description: this.description,
       status: this.status,
+      userId: this.userId,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

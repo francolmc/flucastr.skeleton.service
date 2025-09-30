@@ -13,9 +13,9 @@ import {
 import { TasksRepository } from './tasks.repository';
 import {
   TaskServiceInterface,
-  TaskResponse,
   CreateTaskData,
   UpdateTaskData,
+  TaskResponse,
 } from './interfaces';
 import {
   TaskFilters,
@@ -32,13 +32,16 @@ export class TasksService implements TaskServiceInterface {
   constructor(private readonly tasksRepository: TasksRepository) {}
 
   /**
-   * Obtiene todas las tareas con paginación
+   * Obtiene todas las tareas del usuario con paginación
    */
-  async findAll(options?: PaginationOptions): Promise<TaskResponse[]> {
+  async findAll(
+    userId: string,
+    options?: PaginationOptions,
+  ): Promise<TaskResponse[]> {
     this.logger.log('Finding all tasks');
 
     try {
-      const tasks = await this.tasksRepository.findAll(options);
+      const tasks = await this.tasksRepository.findAll(userId, options);
       this.logger.log(`Retrieved ${tasks.length} tasks`);
       return tasks;
     } catch (error) {
@@ -48,41 +51,38 @@ export class TasksService implements TaskServiceInterface {
   }
 
   /**
-   * Obtiene todas las tareas con paginación completa
+   * Obtiene todas las tareas del usuario con paginación completa
    */
   async findAllPaginated(
+    userId: string,
     options?: PaginationOptions,
   ): Promise<PaginatedResponse<TaskResponse>> {
     this.logger.log('Finding all tasks with pagination');
 
     try {
-      const { page = 1, limit = 10 } = options || {};
-
       const [tasks, total] = await Promise.all([
-        this.tasksRepository.findAll(options),
-        this.tasksRepository.count(),
+        this.tasksRepository.findAll(userId, options),
+        this.tasksRepository.count(userId),
       ]);
 
+      const page = options?.page || 1;
+      const limit = options?.limit || 10;
       const totalPages = Math.ceil(total / limit);
-      const hasNextPage = page < totalPages;
-      const hasPreviousPage = page > 1;
 
-      const result: PaginatedResponse<TaskResponse> = {
+      const paginatedResponse: PaginatedResponse<TaskResponse> = {
         data: tasks,
         meta: {
-          total,
           page,
           limit,
+          total,
           totalPages,
-          hasNextPage,
-          hasPreviousPage,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1,
         },
       };
 
-      this.logger.log(
-        `Retrieved ${tasks.length} of ${total} tasks (page ${page})`,
-      );
-      return result;
+      this.logger.log(`Retrieved ${tasks.length} tasks with pagination`);
+      return paginatedResponse;
     } catch (error) {
       this.logger.error('Error in findAllPaginated:', error);
       throw error;
@@ -90,9 +90,9 @@ export class TasksService implements TaskServiceInterface {
   }
 
   /**
-   * Busca una tarea por ID
+   * Busca una tarea por ID del usuario autenticado
    */
-  async findById(id: number): Promise<TaskResponse> {
+  async findById(id: number, userId: string): Promise<TaskResponse> {
     this.logger.log(`Finding task by ID: ${id}`);
 
     if (!id || id <= 0) {
@@ -100,7 +100,7 @@ export class TasksService implements TaskServiceInterface {
     }
 
     try {
-      const task = await this.tasksRepository.findById(id);
+      const task = await this.tasksRepository.findById(id, userId);
 
       if (!task) {
         throw new NotFoundException(`Task with ID ${id} not found`);
@@ -115,10 +115,11 @@ export class TasksService implements TaskServiceInterface {
   }
 
   /**
-   * Busca tareas aplicando filtros
+   * Busca tareas aplicando filtros para un usuario específico
    */
   async findByFilters(
     filters: TaskFilters,
+    userId: string,
     options?: PaginationOptions,
   ): Promise<TaskResponse[]> {
     this.logger.log(`Finding tasks with filters: ${JSON.stringify(filters)}`);
@@ -131,7 +132,11 @@ export class TasksService implements TaskServiceInterface {
         }
       }
 
-      const tasks = await this.tasksRepository.findByFilters(filters, options);
+      const tasks = await this.tasksRepository.findByFilters(
+        filters,
+        userId,
+        options,
+      );
       this.logger.log(`Found ${tasks.length} tasks with filters`);
       return tasks;
     } catch (error) {
@@ -148,7 +153,7 @@ export class TasksService implements TaskServiceInterface {
 
     try {
       // Validaciones de negocio
-      await this.validateTaskTitle(data.title);
+      await this.validateTaskTitle(data.title, data.userId);
 
       // Crear la tarea
       const task = await this.tasksRepository.create({
@@ -170,34 +175,30 @@ export class TasksService implements TaskServiceInterface {
   /**
    * Actualiza una tarea existente
    */
-  async update(id: number, data: UpdateTaskData): Promise<TaskResponse> {
-    this.logger.log(`Updating task ${id}: ${JSON.stringify(data)}`);
-
+  async update(
+    id: number,
+    data: UpdateTaskData,
+    userId: string,
+  ): Promise<TaskResponse> {
     if (!id || id <= 0) {
       throw new BadRequestException('Invalid task ID');
     }
 
     try {
-      // Verificar que la tarea existe
-      await this.findById(id);
+      // Verificar que la tarea exists
+      await this.findById(id, userId);
 
       // Validar título si se está actualizando
       if (data.title) {
-        await this.validateTaskTitle(data.title, id);
+        await this.validateTaskTitle(data.title, userId, id);
       }
 
       // Actualizar la tarea
-      const updatedTask = await this.tasksRepository.update(id, data);
-
-      this.logger.log(
-        `Task updated successfully: ${updatedTask.id} - ${updatedTask.title}`,
-      );
+      const updatedTask = await this.tasksRepository.update(id, data, userId);
+      this.logger.log(`Task updated successfully: ${updatedTask.id}`);
       return updatedTask;
     } catch (error) {
-      this.logger.error(`Error updating task ${id}:`, {
-        data,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+      this.logger.error(`Error updating task ${id}:`, error);
       throw error;
     }
   }
@@ -205,7 +206,7 @@ export class TasksService implements TaskServiceInterface {
   /**
    * Elimina una tarea
    */
-  async delete(id: number): Promise<void> {
+  async delete(id: number, userId: string): Promise<void> {
     this.logger.log(`Deleting task: ${id}`);
 
     if (!id || id <= 0) {
@@ -213,15 +214,15 @@ export class TasksService implements TaskServiceInterface {
     }
 
     try {
-      // Verificar que la tarea existe
-      const task = await this.findById(id);
+      // Verificar que la tarea exists
+      const task = await this.findById(id, userId);
 
       // Validación de negocio: no permitir eliminar tareas completadas
       if (task.status === TaskStatus.COMPLETED) {
         throw new BadRequestException('Cannot delete completed tasks');
       }
 
-      await this.tasksRepository.delete(id);
+      await this.tasksRepository.delete(id, userId);
       this.logger.log(`Task deleted successfully: ${id}`);
     } catch (error) {
       this.logger.error(`Error deleting task ${id}:`, error);
@@ -232,15 +233,15 @@ export class TasksService implements TaskServiceInterface {
   /**
    * Obtiene métricas de las tareas
    */
-  async getMetrics(): Promise<TaskMetrics> {
+  async getMetrics(userId: string): Promise<TaskMetrics> {
     this.logger.log('Getting task metrics');
 
     try {
-      const metrics = await this.tasksRepository.getMetrics();
+      const metrics = await this.tasksRepository.getMetrics(userId);
       this.logger.log(`Task metrics retrieved: ${JSON.stringify(metrics)}`);
       return metrics;
     } catch (error) {
-      this.logger.error('Error getting task metrics:', error);
+      this.logger.error('Error getting metrics:', error);
       throw error;
     }
   }
@@ -248,26 +249,25 @@ export class TasksService implements TaskServiceInterface {
   /**
    * Marca una tarea como completada
    */
-  async markAsCompleted(id: number): Promise<TaskResponse> {
-    this.logger.log(`Marking task ${id} as completed`);
+  async markAsCompleted(id: number, userId: string): Promise<TaskResponse> {
+    this.logger.log(`Marking task as completed: ${id}`);
 
     try {
-      const task = await this.findById(id);
+      const task = await this.findById(id, userId);
 
-      // Validaciones de negocio
       if (task.status === TaskStatus.COMPLETED) {
         throw new BadRequestException('Task is already completed');
       }
 
-      if (task.status === TaskStatus.CANCELLED) {
-        throw new BadRequestException('Cannot complete a cancelled task');
-      }
+      const updatedTask = await this.tasksRepository.update(
+        id,
+        {
+          status: TaskStatus.COMPLETED,
+        },
+        userId,
+      );
 
-      const updatedTask = await this.tasksRepository.update(id, {
-        status: TaskStatus.COMPLETED,
-      });
-
-      this.logger.log(`Task marked as completed: ${id}`);
+      this.logger.log(`Task marked as completed: ${updatedTask.id}`);
       return updatedTask;
     } catch (error) {
       this.logger.error(`Error marking task ${id} as completed:`, error);
@@ -278,11 +278,11 @@ export class TasksService implements TaskServiceInterface {
   /**
    * Marca una tarea como en progreso
    */
-  async markAsInProgress(id: number): Promise<TaskResponse> {
+  async markAsInProgress(id: number, userId: string): Promise<TaskResponse> {
     this.logger.log(`Marking task ${id} as in progress`);
 
     try {
-      const task = await this.findById(id);
+      const task = await this.findById(id, userId);
 
       // Validaciones de negocio
       if (task.status === TaskStatus.IN_PROGRESS) {
@@ -290,16 +290,16 @@ export class TasksService implements TaskServiceInterface {
       }
 
       if (task.status === TaskStatus.COMPLETED) {
-        throw new BadRequestException('Cannot change status of completed task');
+        throw new BadRequestException('Cannot start a completed task');
       }
 
-      if (task.status === TaskStatus.CANCELLED) {
-        throw new BadRequestException('Cannot start a cancelled task');
-      }
-
-      const updatedTask = await this.tasksRepository.update(id, {
-        status: TaskStatus.IN_PROGRESS,
-      });
+      const updatedTask = await this.tasksRepository.update(
+        id,
+        {
+          status: TaskStatus.IN_PROGRESS,
+        },
+        userId,
+      );
 
       this.logger.log(`Task marked as in progress: ${id}`);
       return updatedTask;
@@ -312,11 +312,11 @@ export class TasksService implements TaskServiceInterface {
   /**
    * Marca una tarea como cancelada
    */
-  async markAsCancelled(id: number): Promise<TaskResponse> {
+  async markAsCancelled(id: number, userId: string): Promise<TaskResponse> {
     this.logger.log(`Marking task ${id} as cancelled`);
 
     try {
-      const task = await this.findById(id);
+      const task = await this.findById(id, userId);
 
       // Validaciones de negocio
       if (task.status === TaskStatus.CANCELLED) {
@@ -327,9 +327,13 @@ export class TasksService implements TaskServiceInterface {
         throw new BadRequestException('Cannot cancel a completed task');
       }
 
-      const updatedTask = await this.tasksRepository.update(id, {
-        status: TaskStatus.CANCELLED,
-      });
+      const updatedTask = await this.tasksRepository.update(
+        id,
+        {
+          status: TaskStatus.CANCELLED,
+        },
+        userId,
+      );
 
       this.logger.log(`Task marked as cancelled: ${id}`);
       return updatedTask;
@@ -344,6 +348,7 @@ export class TasksService implements TaskServiceInterface {
    */
   async findByStatus(
     status: TaskStatus,
+    userId: string,
     options?: PaginationOptions,
   ): Promise<TaskResponse[]> {
     this.logger.log(`Finding tasks by status: ${status}`);
@@ -351,6 +356,7 @@ export class TasksService implements TaskServiceInterface {
     try {
       const tasks = await this.tasksRepository.findByFilters(
         { status },
+        userId,
         options,
       );
       this.logger.log(`Found ${tasks.length} tasks with status ${status}`);
@@ -362,59 +368,35 @@ export class TasksService implements TaskServiceInterface {
   }
 
   /**
-   * Busca tareas por texto
-   */
-  async searchTasks(
-    searchText: string,
-    options?: PaginationOptions,
-  ): Promise<TaskResponse[]> {
-    this.logger.log(`Searching tasks with text: ${searchText}`);
-
-    if (!searchText || searchText.trim().length === 0) {
-      throw new BadRequestException('Search text cannot be empty');
-    }
-
-    try {
-      const tasks = await this.tasksRepository.findByFilters(
-        { search: searchText.trim() },
-        options,
-      );
-      this.logger.log(
-        `Found ${tasks.length} tasks matching search: ${searchText}`,
-      );
-      return tasks;
-    } catch (error) {
-      this.logger.error(
-        `Error searching tasks with text ${searchText}:`,
-        error,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Valida que el título de la tarea sea único
+   * Valida si el título de la tarea ya exists
    */
   private async validateTaskTitle(
     title: string,
+    userId: string,
     excludeId?: number,
   ): Promise<void> {
-    try {
-      // Buscar tareas con el mismo título
-      const existingTasks = await this.tasksRepository.findByFilters({
-        search: title,
-      });
+    if (!title || title.trim().length === 0) {
+      throw new BadRequestException('Task title cannot be empty');
+    }
 
-      // Filtrar por título exacto y excluir la tarea actual si se está actualizando
-      const duplicateTask = existingTasks.find(
-        (task) =>
-          task.title.toLowerCase() === title.toLowerCase() &&
-          task.id !== excludeId,
+    try {
+      const existingTasks = await this.tasksRepository.findByFilters(
+        {
+          search: title,
+        },
+        userId,
       );
+
+      const duplicateTask = existingTasks.find((task) => {
+        return (
+          task.title.toLowerCase() === title.toLowerCase() &&
+          task.id !== excludeId
+        );
+      });
 
       if (duplicateTask) {
         throw new ConflictException(
-          `Task with title "${title}" already exists`,
+          `A task with the title "${title}" already exists`,
         );
       }
     } catch (error) {
@@ -422,7 +404,7 @@ export class TasksService implements TaskServiceInterface {
         throw error;
       }
       this.logger.error('Error validating task title:', error);
-      throw error;
+      throw new BadRequestException('Error validating task title');
     }
   }
 }

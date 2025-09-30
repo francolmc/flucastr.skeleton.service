@@ -17,6 +17,7 @@ export interface TaskResponse {
   title: string;
   description?: string;
   status: TaskStatus;
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +29,7 @@ export interface CreateTaskData {
   title: string;
   description?: string;
   status?: TaskStatus;
+  userId: string;
 }
 
 /**
@@ -43,36 +45,46 @@ export interface UpdateTaskData {
  * Interface para el repositorio de Tasks
  */
 export interface TaskRepositoryInterface {
-  findAll(options?: PaginationOptions): Promise<TaskResponse[]>;
-  findById(id: number): Promise<TaskResponse | null>;
+  findAll(userId: string, options?: PaginationOptions): Promise<TaskResponse[]>;
+  findById(id: number, userId: string): Promise<TaskResponse | null>;
   findByFilters(
     filters: TaskFilters,
+    userId: string,
     options?: PaginationOptions,
   ): Promise<TaskResponse[]>;
   create(data: CreateTaskData): Promise<TaskResponse>;
-  update(id: number, data: UpdateTaskData): Promise<TaskResponse>;
-  delete(id: number): Promise<void>;
-  count(filters?: TaskFilters): Promise<number>;
-  getMetrics(): Promise<TaskMetrics>;
+  update(
+    id: number,
+    data: UpdateTaskData,
+    userId: string,
+  ): Promise<TaskResponse>;
+  delete(id: number, userId: string): Promise<void>;
+  count(userId: string, filters?: TaskFilters): Promise<number>;
+  getMetrics(userId: string): Promise<TaskMetrics>;
 }
 
 /**
  * Interface para el servicio de Tasks
  */
 export interface TaskServiceInterface {
-  findAll(options?: PaginationOptions): Promise<TaskResponse[]>;
-  findById(id: number): Promise<TaskResponse>;
+  findAll(userId: string, options?: PaginationOptions): Promise<TaskResponse[]>;
+  findById(id: number, userId: string): Promise<TaskResponse>;
   findByFilters(
     filters: TaskFilters,
+    userId: string,
     options?: PaginationOptions,
   ): Promise<TaskResponse[]>;
   create(data: CreateTaskData): Promise<TaskResponse>;
-  update(id: number, data: UpdateTaskData): Promise<TaskResponse>;
-  delete(id: number): Promise<void>;
-  getMetrics(): Promise<TaskMetrics>;
-  markAsCompleted(id: number): Promise<TaskResponse>;
-  markAsInProgress(id: number): Promise<TaskResponse>;
-  markAsCancelled(id: number): Promise<TaskResponse>;
+  update(
+    id: number,
+    data: UpdateTaskData,
+    userId: string,
+  ): Promise<TaskResponse>;
+  delete(id: number, userId: string): Promise<void>;
+  getMetrics(userId: string): Promise<TaskMetrics>;
+  markAsCompleted(id: number, userId: string): Promise<TaskResponse>;
+  markAsInProgress(id: number, userId: string): Promise<TaskResponse>;
+  markAsCancelled(id: number, userId: string): Promise<TaskResponse>;
 }
 
 /**

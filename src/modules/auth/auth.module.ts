@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AuthExampleController } from './auth-example.controller';
+import { HttpModule } from '@nestjs/axios';
+import { AuthController } from './auth.controller';
 import { JwtGuard } from '../../shared/guards/jwt.guard';
 import { RbacGuard } from '../../shared/guards/rbac.guard';
 import { AbacGuard } from '../../shared/guards/abac.guard';
 import { JwtConfig, JwtConfigUtils } from '../../config/jwt.config';
+import { AuthService } from './services/auth.service';
 
 type JwtAlgorithm = 'HS256' | 'HS384' | 'HS512' | 'RS256' | 'RS384' | 'RS512';
 
@@ -15,6 +17,8 @@ type JwtAlgorithm = 'HS256' | 'HS384' | 'HS512' | 'RS256' | 'RS384' | 'RS512';
  */
 @Module({
   imports: [
+    ConfigModule,
+    HttpModule,
     // Configurar JwtModule con configuración dinámica
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -41,9 +45,9 @@ type JwtAlgorithm = 'HS256' | 'HS384' | 'HS512' | 'RS256' | 'RS384' | 'RS512';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthExampleController],
-  providers: [JwtGuard, RbacGuard, AbacGuard],
-  exports: [JwtGuard, RbacGuard, AbacGuard, JwtModule],
+  controllers: [AuthController],
+  providers: [AuthService, JwtGuard, RbacGuard, AbacGuard],
+  exports: [AuthService, JwtGuard, RbacGuard, AbacGuard, JwtModule],
 })
 export class AuthModule {
   constructor(private readonly configService: ConfigService) {

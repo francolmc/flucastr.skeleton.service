@@ -25,9 +25,12 @@ export class TasksRepository implements TaskRepositoryInterface {
   constructor(private readonly databaseService: DatabaseService) {}
 
   /**
-   * Obtiene todas las tareas con paginación opcional
+   * Obtiene todas las tareas de un usuario con paginación opcional
    */
-  async findAll(options?: PaginationOptions): Promise<TaskResponse[]> {
+  async findAll(
+    userId: string,
+    options?: PaginationOptions,
+  ): Promise<TaskResponse[]> {
     this.logger.log('Finding all tasks');
 
     try {
@@ -44,6 +47,9 @@ export class TasksRepository implements TaskRepositoryInterface {
       const skip = (pageNum - 1) * limitNum;
 
       const tasks = await this.databaseService.tasks.findMany({
+        where: {
+          userId,
+        },
         skip,
         take: limitNum,
         orderBy: {
@@ -60,14 +66,17 @@ export class TasksRepository implements TaskRepositoryInterface {
   }
 
   /**
-   * Busca una tarea por ID
+   * Busca una tarea por ID del usuario autenticado
    */
-  async findById(id: number): Promise<TaskResponse | null> {
+  async findById(id: number, userId: string): Promise<TaskResponse | null> {
     this.logger.log(`Finding task by ID: ${id}`);
 
     try {
       const task = await this.databaseService.tasks.findUnique({
-        where: { id },
+        where: {
+          id,
+          userId,
+        },
       });
 
       if (!task) {
@@ -84,10 +93,11 @@ export class TasksRepository implements TaskRepositoryInterface {
   }
 
   /**
-   * Busca tareas aplicando filtros
+   * Busca tareas aplicando filtros para un usuario específico
    */
   async findByFilters(
     filters: TaskFilters,
+    userId: string,
     options?: PaginationOptions,
   ): Promise<TaskResponse[]> {
     this.logger.log(`Finding tasks with filters: ${JSON.stringify(filters)}`);
@@ -105,7 +115,7 @@ export class TasksRepository implements TaskRepositoryInterface {
       const limitNum = Number(limit);
       const skip = (pageNum - 1) * limitNum;
 
-      const whereClause = this.buildWhereClause(filters);
+      const whereClause = this.buildWhereClause(filters, userId);
 
       const tasks = await this.databaseService.tasks.findMany({
         where: whereClause,
@@ -136,6 +146,7 @@ export class TasksRepository implements TaskRepositoryInterface {
           title: data.title,
           description: data.description,
           status: data.status || TaskStatus.PENDING,
+          userId: data.userId,
         },
       });
 
@@ -151,16 +162,22 @@ export class TasksRepository implements TaskRepositoryInterface {
   }
 
   /**
-   * Actualiza una tarea existente
+   * Actualiza una tarea existente del usuario autenticado
    */
-  async update(id: number, data: UpdateTaskData): Promise<TaskResponse> {
+  async update(
+    id: number,
+    data: UpdateTaskData,
+    userId: string,
+  ): Promise<TaskResponse> {
     this.logger.log(`Updating task ${id}: ${JSON.stringify(data)}`);
 
     try {
-      // Verificar que la tarea existe
-      const existingTask = await this.findById(id);
+      // Verificar que la tarea existe y pertenece al usuario
+      const existingTask = await this.findById(id, userId);
       if (!existingTask) {
-        throw new NotFoundException(`Task with ID ${id} not found`);
+        throw new NotFoundException(
+          `Task with ID ${id} not found or access denied`,
+        );
       }
 
       const updatedTask = await this.databaseService.tasks.update({
@@ -188,16 +205,18 @@ export class TasksRepository implements TaskRepositoryInterface {
   }
 
   /**
-   * Elimina una tarea
+   * Elimina una tarea del usuario autenticado
    */
-  async delete(id: number): Promise<void> {
+  async delete(id: number, userId: string): Promise<void> {
     this.logger.log(`Deleting task: ${id}`);
 
     try {
-      // Verificar que la tarea existe
-      const existingTask = await this.findById(id);
+      // Verificar que la tarea existe y pertenece al usuario
+      const existingTask = await this.findById(id, userId);
       if (!existingTask) {
-        throw new NotFoundException(`Task with ID ${id} not found`);
+        throw new NotFoundException(
+          `Task with ID ${id} not found or access denied`,
+        );
       }
 
       await this.databaseService.tasks.delete({
@@ -212,13 +231,15 @@ export class TasksRepository implements TaskRepositoryInterface {
   }
 
   /**
-   * Cuenta el número total de tareas con filtros opcionales
+   * Cuenta el número total de tareas de un usuario con filtros opcionales
    */
-  async count(filters?: TaskFilters): Promise<number> {
+  async count(userId: string, filters?: TaskFilters): Promise<number> {
     this.logger.log('Counting tasks');
 
     try {
-      const whereClause = filters ? this.buildWhereClause(filters) : {};
+      const whereClause = filters
+        ? this.buildWhereClause(filters, userId)
+        : { userId };
 
       const count = await this.databaseService.tasks.count({
         where: whereClause,
@@ -233,29 +254,32 @@ export class TasksRepository implements TaskRepositoryInterface {
   }
 
   /**
-   * Obtiene métricas de las tareas
+   * Obtiene métricas de las tareas del usuario
    */
-  async getMetrics(): Promise<TaskMetrics> {
+  async getMetrics(userId: string): Promise<TaskMetrics> {
     this.logger.log('Getting task metrics');
 
     try {
       const [total, pending, inProgress, completed, cancelled, createdToday] =
         await Promise.all([
-          this.databaseService.tasks.count(),
           this.databaseService.tasks.count({
-            where: { status: TaskStatus.PENDING },
+            where: { userId },
           }),
           this.databaseService.tasks.count({
-            where: { status: TaskStatus.IN_PROGRESS },
+            where: { userId, status: TaskStatus.PENDING },
           }),
           this.databaseService.tasks.count({
-            where: { status: TaskStatus.COMPLETED },
+            where: { userId, status: TaskStatus.IN_PROGRESS },
           }),
           this.databaseService.tasks.count({
-            where: { status: TaskStatus.CANCELLED },
+            where: { userId, status: TaskStatus.COMPLETED },
+          }),
+          this.databaseService.tasks.count({
+            where: { userId, status: TaskStatus.CANCELLED },
           }),
           this.databaseService.tasks.count({
             where: {
+              userId,
               createdAt: {
                 gte: new Date(new Date().setHours(0, 0, 0, 0)),
               },
@@ -281,10 +305,11 @@ export class TasksRepository implements TaskRepositoryInterface {
   }
 
   /**
-   * Construye la cláusula WHERE para filtros
+   * Construye la cláusula WHERE para filtros incluyendo userId
    */
-  private buildWhereClause(filters: TaskFilters) {
+  private buildWhereClause(filters: TaskFilters, userId?: string) {
     const where: {
+      userId?: string;
       status?: string;
       createdAt?: {
         gte?: Date;
@@ -301,6 +326,11 @@ export class TasksRepository implements TaskRepositoryInterface {
         };
       }>;
     } = {};
+
+    // Filtrar por usuario si se proporciona
+    if (userId) {
+      where.userId = userId;
+    }
 
     if (filters.status) {
       where.status = filters.status;
@@ -344,6 +374,7 @@ export class TasksRepository implements TaskRepositoryInterface {
     title: string;
     description: string | null;
     status: string;
+    userId: string;
     createdAt: Date;
     updatedAt: Date;
   }): TaskResponse {
@@ -352,6 +383,7 @@ export class TasksRepository implements TaskRepositoryInterface {
       title: task.title,
       description: task.description || undefined,
       status: task.status as TaskStatus,
+      userId: task.userId,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     };

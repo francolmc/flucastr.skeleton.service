@@ -6,11 +6,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
-import { JwtConfig } from '../../config/jwt.config';
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+import { AuthService } from '../../modules/auth/services/auth.service';
+import { ValidatedEnvironmentVariables } from '../../config/env.validation';
+import {
+  AuthenticatedUser,
+  JwtPayload,
+  ValidatedExternalUser,
+} from '../interfaces/auth.interface';
 
 /**
  * Interfaz extendida de Request que incluye el usuario autenticado
@@ -19,51 +22,20 @@ interface RequestWithUser extends Request {
   user?: AuthenticatedUser;
 }
 
-/**
- * Interfaz para el payload del JWT
- */
-export interface JwtPayload {
-  sub: string; // User ID
-  email?: string;
-  username?: string;
-  roles?: string[];
-  permissions?: string[];
-  tenant_id?: string;
-  iat?: number;
-  exp?: number;
-  iss?: string;
-  aud?: string;
-  [key: string]: any;
-}
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 
 /**
- * Interfaz para el usuario autenticado
- */
-export interface AuthenticatedUser {
-  id: string;
-  email?: string;
-  username?: string;
-  roles: string[];
-  permissions: string[];
-  tenantId?: string;
-  payload: JwtPayload;
-}
-
-/**
- * Guard JWT para validación de tokens
+ * Guard JWT para validación de tokens usando introspección con servicio externo
  * Este guard NO genera tokens, solo los valida
  */
 @Injectable()
 export class JwtGuard implements CanActivate {
   private readonly logger = new Logger(JwtGuard.name);
-  private readonly jwtConfig: JwtConfig;
 
   constructor(
-    private readonly configService: ConfigService,
-    private readonly jwtService: JwtService,
-  ) {
-    this.jwtConfig = this.configService.get<JwtConfig>('jwt')!;
-  }
+    private readonly configService: ConfigService<ValidatedEnvironmentVariables>,
+    private readonly authService: AuthService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
@@ -73,32 +45,37 @@ export class JwtGuard implements CanActivate {
       const token = this.extractTokenFromRequest(request);
 
       if (!token) {
-        if (this.jwtConfig.enableLogging) {
-          this.logger.warn('No JWT token found in request');
-        }
+        this.logger.warn('No JWT token found in request');
         throw new UnauthorizedException('Access token is required');
       }
 
-      // Validar y decodificar token
-      const payload = await this.validateToken(token);
+      // Validar token usando introspección
+      const user = await this.authService.validateToken(token);
 
-      // Crear usuario autenticado
-      const user = this.createAuthenticatedUser(payload);
+      if (!user) {
+        this.logger.warn('Token validation failed - invalid or inactive token');
+        throw new UnauthorizedException('Invalid token');
+      }
+
+      if (!user.isActive) {
+        this.logger.warn(
+          `Token validation failed - user ${user.id} is inactive`,
+        );
+        throw new UnauthorizedException('User account is inactive');
+      }
+
+      // Crear usuario autenticado adaptado a la interfaz existente
+      const authenticatedUser = this.createAuthenticatedUser(user);
 
       // Agregar usuario a la request
-      request.user = user;
+      request.user = authenticatedUser;
 
-      if (this.jwtConfig.enableLogging) {
-        this.logger.log(`User authenticated: ${user.id}`);
-      }
-
+      this.logger.debug(`User authenticated: ${user.id}`);
       return true;
-    } catch (error) {
-      if (this.jwtConfig.logFailedAttempts) {
-        this.logger.warn(
-          `JWT validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
-      }
+    } catch (error: any) {
+      this.logger.warn(
+        `JWT validation failed: ${error?.message ?? 'Unknown error'}`,
+      );
 
       if (error instanceof UnauthorizedException) {
         throw error;
@@ -112,100 +89,63 @@ export class JwtGuard implements CanActivate {
    * Extrae el token JWT de la request
    */
   private extractTokenFromRequest(request: RequestWithUser): string | null {
-    let token: string | null = null;
+    const extractFromHeader = this.configService.get(
+      'JWT_EXTRACT_FROM_HEADER',
+      {
+        infer: true,
+      },
+    );
 
-    // 1. Extraer del header Authorization
-    if (this.jwtConfig.extractFromHeader && request.headers.authorization) {
-      const authHeader = request.headers.authorization;
-      if (authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7);
-      }
+    if (!extractFromHeader) {
+      return null;
     }
 
-    // 2. Extraer de query parameter
-    if (
-      !token &&
-      this.jwtConfig.extractFromQuery &&
-      request.query[this.jwtConfig.queryParam]
-    ) {
-      token = request.query[this.jwtConfig.queryParam] as string;
+    const headerName =
+      this.configService
+        .get('JWT_HEADER_NAME', {
+          infer: true,
+        })
+        ?.toLowerCase() || 'authorization';
+
+    const authHeader = request.headers[headerName];
+    if (!authHeader || typeof authHeader !== 'string') {
+      return null;
     }
 
-    // 3. Extraer de cookie
-    if (
-      !token &&
-      this.jwtConfig.extractFromCookie &&
-      request.cookies &&
-      this.jwtConfig.cookieName in request.cookies
-    ) {
-      token = request.cookies[this.jwtConfig.cookieName] as string;
+    // Support both "Bearer token" and just "token" formats
+    if (authHeader.startsWith('Bearer ')) {
+      return authHeader.substring(7);
     }
 
-    return token;
+    // If it doesn't start with Bearer, assume it's just the token
+    return authHeader;
   }
 
   /**
-   * Valida el token JWT
+   * Crea el objeto de usuario autenticado adaptado desde AuthService
    */
-  private async validateToken(token: string): Promise<JwtPayload> {
-    try {
-      const options = {
-        secret: this.jwtConfig.secret,
-        algorithms: [this.jwtConfig.algorithm as any],
-        issuer: this.jwtConfig.issuer,
-        audience: this.jwtConfig.audience,
-        ignoreExpiration: this.jwtConfig.ignoreExpiration,
-        clockTolerance: this.jwtConfig.clockTolerance,
-        maxAge: this.jwtConfig.maxAge,
-      };
-
-      // Filtrar opciones undefined
-      const cleanOptions = Object.fromEntries(
-        Object.entries(options).filter(([, value]) => value !== undefined),
-      );
-
-      const payload = await this.jwtService.verifyAsync(token, cleanOptions);
-
-      return payload as JwtPayload;
-    } catch (error) {
-      const errorName = error instanceof Error ? error.name : 'Unknown';
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      if (errorName === 'TokenExpiredError') {
-        throw new UnauthorizedException('Access token has expired');
-      }
-
-      if (errorName === 'JsonWebTokenError') {
-        throw new UnauthorizedException('Invalid access token format');
-      }
-
-      if (errorName === 'NotBeforeError') {
-        throw new UnauthorizedException('Access token not active yet');
-      }
-
-      throw new UnauthorizedException(
-        `Token validation failed: ${errorMessage}`,
-      );
-    }
-  }
-
-  /**
-   * Crea el objeto de usuario autenticado desde el payload
-   */
-  private createAuthenticatedUser(payload: JwtPayload): AuthenticatedUser {
-    const rolesKey = this.jwtConfig.rolesClaimKey;
-    const permissionsKey = this.jwtConfig.permissionsClaimKey;
-    const userIdKey = this.jwtConfig.userIdClaimKey;
-    const tenantIdKey = this.jwtConfig.tenantIdClaimKey;
+  private createAuthenticatedUser(
+    user: ValidatedExternalUser,
+  ): AuthenticatedUser {
+    // Create a mock JWT payload for compatibility
+    const mockPayload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      roles: user.roles,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+      iss: 'flucastr-auth-service',
+      aud: 'flucastr-services',
+    };
 
     return {
-      id: payload[userIdKey] || payload.sub,
-      email: payload.email,
-      username: payload.username || payload.preferred_username,
-      roles: payload[rolesKey] || [],
-      permissions: payload[permissionsKey] || [],
-      tenantId: payload[tenantIdKey],
-      payload,
+      id: user.id,
+      email: user.email,
+      username: user.email, // Use email as username if not provided
+      roles: user.roles,
+      permissions: [], // No permissions in current auth service response
+      tenantId: undefined,
+      payload: mockPayload,
     };
   }
 }

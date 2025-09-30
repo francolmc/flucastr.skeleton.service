@@ -18,6 +18,9 @@ model Tasks {
   title     String   @unique
   description String?
   status    String @default("pending")
+  userId    String   // ID del usuario que creó la tarea
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
