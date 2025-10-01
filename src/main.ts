@@ -1,8 +1,9 @@
 import { NestFactory } from '@nestjs/core';
-import { VersioningType } from '@nestjs/common';
+import { VersioningType, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { SwaggerModule } from '@nestjs/swagger';
 import { WinstonModule } from 'nest-winston';
+import helmet from 'helmet';
 import { LoggingInterceptor } from './shared/interceptors/logging.interceptor';
 import {
   createWinstonConfig,
@@ -23,6 +24,15 @@ async function bootstrap() {
   const globalPrefix = AppConfigUtils.getGlobalPrefix();
   app.setGlobalPrefix(globalPrefix);
 
+  // Enable CORS
+  const corsConfig = AppConfigUtils.getCorsConfig();
+  if (corsConfig.enabled) {
+    app.enableCors(corsConfig);
+  }
+
+  // Enable Helmet security headers
+  app.use(helmet(AppConfigUtils.getHelmetConfig()));
+
   // Enable versioning
   app.enableVersioning({
     type: VersioningType.URI,
@@ -30,6 +40,11 @@ async function bootstrap() {
 
   // Global logging interceptor
   app.useGlobalInterceptors(new LoggingInterceptor());
+
+  // Global validation pipe
+  app.useGlobalPipes(
+    new ValidationPipe(AppConfigUtils.getValidationPipeOptions()),
+  );
 
   // Swagger configuration
   if (SwaggerUtils.isEnabled()) {

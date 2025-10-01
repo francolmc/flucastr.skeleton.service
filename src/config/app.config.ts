@@ -355,7 +355,54 @@ export class AppConfigUtils {
   }
 
   /**
-   * Obtiene la configuración de CORS
+   * Obtiene la configuración de CORS completa
+   */
+  static getCorsConfig() {
+    const isDevelopment = AppConfigUtils.isDevelopment();
+
+    return {
+      enabled: process.env.CORS_ENABLED !== 'false',
+      origin: process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN === '*'
+          ? true
+          : process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
+        : isDevelopment
+          ? true
+          : false,
+      methods: process.env.CORS_METHODS
+        ? process.env.CORS_METHODS.split(',').map((method) =>
+            method.trim().toUpperCase(),
+          )
+        : ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: process.env.CORS_ALLOWED_HEADERS
+        ? process.env.CORS_ALLOWED_HEADERS.split(',').map((header) =>
+            header.trim(),
+          )
+        : [
+            'Origin',
+            'X-Requested-With',
+            'Content-Type',
+            'Accept',
+            'Authorization',
+            'X-API-Key',
+          ],
+      exposedHeaders: process.env.CORS_EXPOSED_HEADERS
+        ? process.env.CORS_EXPOSED_HEADERS.split(',').map((header) =>
+            header.trim(),
+          )
+        : ['X-Total-Count', 'X-Page-Count'],
+      credentials: process.env.CORS_CREDENTIALS === 'true',
+      maxAge: parseInt(process.env.CORS_MAX_AGE || '86400', 10),
+      preflightContinue: process.env.CORS_PREFLIGHT_CONTINUE === 'true',
+      optionsSuccessStatus: parseInt(
+        process.env.CORS_OPTIONS_SUCCESS_STATUS || '204',
+        10,
+      ),
+    };
+  }
+
+  /**
+   * Obtiene la configuración de CORS (método legacy)
    */
   static getCorsOrigins(): string[] | boolean {
     if (!process.env.CORS_ORIGIN) {
@@ -393,6 +440,37 @@ export class AppConfigUtils {
       enableDebugMessages:
         process.env.VALIDATION_ENABLE_DEBUG_MESSAGES === 'true' &&
         AppConfigUtils.isDevelopment(),
+    };
+  }
+
+  /**
+   * Obtiene la configuración de Helmet para headers de seguridad
+   */
+  static getHelmetConfig() {
+    const isProduction = AppConfigUtils.isProduction();
+
+    return {
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+        },
+      },
+      crossOriginEmbedderPolicy: isProduction,
+      crossOriginOpenerPolicy: isProduction,
+      crossOriginResourcePolicy: isProduction,
+      dnsPrefetchControl: true,
+      frameguard: true,
+      hidePoweredBy: true,
+      hsts: isProduction,
+      ieNoOpen: true,
+      noSniff: true,
+      originAgentCluster: true,
+      permittedCrossDomainPolicies: true,
+      referrerPolicy: true,
+      xssFilter: true,
     };
   }
 
